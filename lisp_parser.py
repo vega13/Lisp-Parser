@@ -2,17 +2,7 @@ from token_parser import tokens
 from token_type import Type
 from token import Token
 from ast_parser import parsed_ast
-
-
-# utils
-def log(*args):
-    print(*args)
-
-
-def ensure(condition, message):
-    # 条件成立
-    if not condition:
-        log('测试失败:', message)
+from utils import log, ensure
 
 
 class Stack(object):
@@ -99,7 +89,7 @@ def eval_list(l):
     t = l[0]
     if t.type in op_type:
         value = eval_op(l)
-    if t.type == Type.log:
+    elif t.type == Type.log:
         value = 'null'
         s = ''
         for i in range(1, len(l)):
@@ -112,7 +102,7 @@ def eval_list(l):
     return value
 
 
-def apply_list(stack, vars=None):
+def apply_list(stack, var_list=None):
     # 过滤特殊符号
     l = filter_tokens(stack, Type.bracket_left)
     # 对 list 求值
@@ -140,17 +130,17 @@ def list_end(code, index):
     return ts, i
 
 
-def eval_tokens(is_yes, tokens):
-    t = tokens[0]
+def eval_tokens(is_yes, token_list):
+    t = token_list[0]
     if t.type == Type.bracket_left:
-        ts, end = list_end(tokens, 1)
+        ts, end = list_end(token_list, 1)
         if is_yes is True:
-            ts = tokens[:end]
+            ts = token_list[:end]
             value = _apply(ts)
             return value[0]
         else:
-            ts = tokens[end:]
-            t = tokens[0]
+            ts = token_list[end:]
+            t = token_list[0]
             if t.type == Type.bracket_left:
                 value = _apply(ts)
                 return value[0]
@@ -160,38 +150,38 @@ def eval_tokens(is_yes, tokens):
         if is_yes is True:
             return t
         else:
-            ts = tokens[1:]
+            ts = token_list[1:]
             t = ts[0]
             if t.type == Type.bracket_left:
                 value = _apply(ts)
                 return value[0]
             else:
-                return tokens[1]
+                return token_list[1]
 
 
-def apply_if(tokens):
+def apply_if(token_list):
     ts = []
     i = 0
-    t = tokens[i]
+    t = token_list[i]
 
     if t.type == Type.bracket_left:
         while t.type != Type.bracket_right:
             ts.append(t)
             i += 1
-            t = tokens[i]
+            t = token_list[i]
 
         is_yes = apply_list(ts)
-        value = eval_tokens(is_yes, tokens[i+1:])
+        value = eval_tokens(is_yes, token_list[i+1:])
         return value
     elif t.type == Type.yes:
-        value = eval_tokens(True, tokens[1:])
+        value = eval_tokens(True, token_list[1:])
         return value
     elif t.type == Type.no:
-        value = eval_tokens(False, tokens[1:])
+        value = eval_tokens(False, token_list[1:])
         return value
 
 
-def _apply(code, vars=None, recursion=True):
+def _apply(code, var_list=None, recursion=True):
     values = []
     stack = Stack()
     i = 0
@@ -202,7 +192,7 @@ def _apply(code, vars=None, recursion=True):
         # log(t, t.type)
 
         if t.type == Type.bracket_right:
-            ts = apply_list(stack, vars)
+            ts = apply_list(stack, var_list)
             stack.push(ts)
         elif t.type == Type.if_:
             # 弹出之前的 [
@@ -227,9 +217,26 @@ def _apply(code, vars=None, recursion=True):
 
 
 def apply(code):
-    vars = {}
-    # return _apply(code, vars, False)
-    return _apply(code, vars, True)
+    var_list = {}
+    # return _apply(code, var_list, False)
+    return _apply(code, var_list, True)
+
+
+def ast_apply(code):
+    ts = code
+    l = []
+
+    while len(ts) > 0:
+        token = ts[0]
+        del ts[0]
+
+        if type(token) == list:
+            t = Token.eval(token)
+            l.append(t)
+        else:
+            l.append(token)
+
+    return l
 
 
 def test_tokens():
@@ -270,19 +277,20 @@ def test_apply():
     ]
     """
     t1 = tokens(c1)
+    a1 = parsed_ast(t1)
     v1 = [3, 24, 'null', 0, 3, 'null']
-    ensure(apply(t1) == v1, 'test tokens 1')
+    ensure(ast_apply(a1) == v1, 'test tokens 1')
 
-    c2 = """
-    [set a 1]
-    [set b 2]
-    [+ a b]
-    """
-    t2 = tokens(c2)
-    log('tokens', t2)
-    a2 = parsed_ast(t2)
-    log('parsed_ast', a2)
-    v2 = [1, 2, 3]
+    # c2 = """
+    # [set a 1]
+    # [set b 2]
+    # [+ a b]
+    # """
+    # t2 = tokens(c2)
+    # log('tokens', t2)
+    # a2 = parsed_ast(t2)
+    # log('parsed_ast', a2)
+    # v2 = [1, 2, 3]
     # log(apply(t2))
     # ensure(apply(t2) == v2, 'test tokens 1')
 

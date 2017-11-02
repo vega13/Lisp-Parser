@@ -1,4 +1,71 @@
 from token_type import Type
+from utils import log
+
+
+def eval_op(l):
+    value = None
+    op = l[0]
+    op = Token.eval(op)
+    l = l[1:]
+    # log('op', op)
+    if op in '+-*/%':
+        value = l[0]
+        value = Token.eval(value)
+        for i in range(1, len(l)):
+            t = l[i]
+            t = Token.eval(t)
+            if op == '+':
+                value += t
+            elif op == '-':
+                value -= t
+            elif op == '*':
+                value *= t
+            elif op == '/':
+                value /= t
+            elif op == '%':
+                value %= t
+    elif op in '=!><':
+        a = Token.eval(l[0])
+        b = Token.eval(l[1])
+        # log('a b', a, b)
+        if op == '=':
+            value = (a == b)
+        elif op == '!':
+            value = (a != b)
+        elif op == '>':
+            value = (a > b)
+        elif op == '<':
+            value = (a < b)
+
+    return value
+
+
+def eval_list(l):
+    value = None
+    op_type = [Type.add, Type.min, Type.mul, Type.div, Type.mod, Type.equal,
+               Type.not_equal, Type.greater, Type.less]
+    t = l[0]
+    if t.type in op_type:
+        value = eval_op(l)
+    elif t.type == Type.log:
+        value = 'null'
+        s = ''
+        for i in range(1, len(l)):
+            t = l[i]
+            t = Token.eval(t)
+            s += t
+            s += ' '
+        log('>>>', s)
+    elif t.type == Type.if_:
+        t = l[1]
+        t = Token.eval(t)
+        if t is True:
+            value = l[2]
+        else:
+            value = l[3]
+        value = Token.eval(value)
+
+    return value
 
 
 class Token(object):
@@ -64,5 +131,7 @@ class Token(object):
                 return None
             else:
                 return token.value
+        elif type(token) == list:
+            return eval_list(token)
         else:
             return token
