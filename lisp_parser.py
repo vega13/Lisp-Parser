@@ -1,22 +1,12 @@
-from enum import Enum
+from token_parser import tokens
+from token_type import Type
+from token import Token
+from ast_parser import parsed_ast
 
 
 # utils
 def log(*args):
     print(*args)
-
-
-def auto_number():
-    n = 0
-
-    def auto_add_number():
-        nonlocal n
-        n += 1
-        return n
-
-    return auto_add_number
-
-auto_number = auto_number()
 
 
 def ensure(condition, message):
@@ -45,207 +35,8 @@ class Stack(object):
         return s
 
 
-class Type(Enum):
-    auto = auto_number()                    # auto 就是 15 个特殊符号
-    colon = auto_number()                   # :
-    comma = auto_number()                   # ,
-    brace_left = auto_number()              # {
-    brace_right = auto_number()             # }
-    bracket_left = auto_number()            # [
-    bracket_right = auto_number()           # ]
-    add = auto_number()                     # +
-    min = auto_number()                     # -
-    mul = auto_number()                     # *
-    div = auto_number()                     # /
-    mod = auto_number()                     # %
-    equal = auto_number()                   # =
-    not_equal = auto_number()               # !
-    greater = auto_number()                 # >
-    less = auto_number()                    # <
-    number = auto_number()                  # 123
-    string = auto_number()                  # "nice"
-    yes = auto_number()                     # True
-    no = auto_number()                      # False
-    null = auto_number()                    # None
-    log = auto_number()                     # log
-    if_ = auto_number()                     # if
-
-
-class Token(object):
-    def __init__(self, token_type, token_value):
-        super(Token, self).__init__()
-        d = {
-            '[': Type.bracket_left,
-            ']': Type.bracket_right,
-            '+': Type.add,
-            '-': Type.min,
-            '*': Type.mul,
-            '/': Type.div,
-            '%': Type.mod,
-            '=': Type.equal,
-            '!': Type.not_equal,
-            '>': Type.greater,
-            '<': Type.less,
-        }
-        if token_type == Type.auto:
-            self.type = d[token_value]
-        else:
-            self.type = token_type
-        self.value = token_value
-
-    def __repr__(self):
-        if self.type == Type.string:
-            s = '("{}")'.format(self.value)
-        else:
-            s = '({})'.format(self.value)
-        return s
-
-    @staticmethod
-    def type(token):
-        op_type = [Type.add, Type.min, Type.mul, Type.div, Type.mod, Type.equal,
-                   Type.not_equal, Type.greater, Type.less]
-        token_type = type(token)
-        if token_type == Token:
-            if token.type in op_type:
-                return token_type
-            if token.type == Type.number:
-                return int(token.value)
-            elif token.type == Type.yes:
-                return True
-            elif token.type == Type.no:
-                return False
-            elif token.type == Type.null:
-                return None
-            else:
-                return token_type
-        else:
-            return token_type
-
-    @staticmethod
-    def eval(token):
-        if type(token) == Token:
-            if token.type == Type.number:
-                return int(token.value)
-            elif token.type == Type.yes:
-                return True
-            elif token.type == Type.no:
-                return False
-            elif token.type == Type.null:
-                return None
-            else:
-                return token.value
-        else:
-            return token
-
-
-def string_end(code, index):
-    escape_symbol = ['\\', '"']
-    s = ''
-    i = index
-
-    while i < len(code):
-        c = code[i]
-        i += 1
-        if c == '"':
-            break
-        elif c == '\\':
-            c = code[i]
-            if c in escape_symbol:
-                s += c
-                i += 1
-            elif c == 't':
-                s += '\t'
-                i += 1
-            elif code[i] == 'n':
-                s += '\n'
-                i += 1
-            else:
-                # 未定义转义，应报错
-                pass
-        else:
-            s += c
-
-    return s, i
-
-
-def number_end(code, index):
-    digits = '0123456789'
-    n = code[index-1]
-
-    while code[index] in digits:
-        n += code[index]
-        index += 1
-
-    return n, index
-
-
-def annotation_end(code, index):
-    offset = index
-    newline = '\r\n'
-
-    while code[offset] not in newline:
-        offset += 1
-
-    end = offset + 1
-    return end
-
-
-def tokens(code):
-    op_tokens = ['[', ']', '+', '-', '*', '/', '%', '=', '!', '>', '<']
-    spaces = [' ', '\n', '\r', '\t']
-    annotation = ';'
-    digits = '0123456789'
-
+def filter_tokens(stack, return_token):
     ts = []
-    i = 0
-
-    while i < len(code):
-        c = code[i]
-        i += 1
-
-        if c in spaces:
-            continue
-        elif c in annotation:
-            end = annotation_end(code, i)
-            i = end
-        elif c in op_tokens:
-            t = Token(Type.auto, c)
-            ts.append(t)
-        elif c == '\"':
-            s, end = string_end(code, i)
-            i = end
-            t = Token(Type.string, s)
-            ts.append(t)
-        elif c in digits:
-            n, end = number_end(code, i)
-            i = end
-            t = Token(Type.number, n)
-            ts.append(t)
-        elif c == 'y':
-            i += 2
-            t = Token(Type.yes, 'yes')
-            ts.append(t)
-        elif c == 'n':
-            i += 1
-            t = Token(Type.no, 'no')
-            ts.append(t)
-        elif c == 'l':
-            i += 2
-            t = Token(Type.log, 'log')
-            ts.append(t)
-        elif c == 'i':
-            i += 1
-            t = Token(Type.if_, 'if')
-            ts.append(t)
-        else:
-            # 此处应报错
-            pass
-
-    # log('json_tokens', tokens)
-    return ts
-
-
-def filter_tokens(stack, ts, return_token):
     op_tokens = [Type.colon, Type.comma]
     t = stack.pop()
 
@@ -253,7 +44,7 @@ def filter_tokens(stack, ts, return_token):
         if type(t) == Token:
             # 当遇到 [ 或 { 时结束
             if t.type == return_token:
-                break
+                return ts
             # : 或 , 直接过滤
             elif t.type in op_tokens:
                 t = stack.pop()
@@ -321,11 +112,9 @@ def eval_list(l):
     return value
 
 
-def apply_list(stack):
-    l = []
-
+def apply_list(stack, vars=None):
     # 过滤特殊符号
-    filter_tokens(stack, l, Type.bracket_left)
+    l = filter_tokens(stack, Type.bracket_left)
     # 对 list 求值
     value = eval_list(l)
 
@@ -402,7 +191,7 @@ def apply_if(tokens):
         return value
 
 
-def _apply(code, recursion=True):
+def _apply(code, vars=None, recursion=True):
     values = []
     stack = Stack()
     i = 0
@@ -413,7 +202,7 @@ def _apply(code, recursion=True):
         # log(t, t.type)
 
         if t.type == Type.bracket_right:
-            ts = apply_list(stack)
+            ts = apply_list(stack, vars)
             stack.push(ts)
         elif t.type == Type.if_:
             # 弹出之前的 [
@@ -438,14 +227,18 @@ def _apply(code, recursion=True):
 
 
 def apply(code):
-    return _apply(code, False)
+    vars = {}
+    # return _apply(code, vars, False)
+    return _apply(code, vars, True)
 
 
 def test_tokens():
-    c1 = """
-    [+ 1 2]
-    """
-    t1 = '[([), (+), (1), (2), (])]'
+    c1 = '''
+        [set a 1]
+        [set b 2]
+        [+ a b]
+    '''
+    t1 = '[([), (set), (a), (1), (]), ([), (set), (b), (2), (]), ([), (+), (a), (b), (])]'
     ensure(str(tokens(c1)) == t1, 'test tokens 1')
 
     c2 = """
@@ -479,6 +272,19 @@ def test_apply():
     t1 = tokens(c1)
     v1 = [3, 24, 'null', 0, 3, 'null']
     ensure(apply(t1) == v1, 'test tokens 1')
+
+    c2 = """
+    [set a 1]
+    [set b 2]
+    [+ a b]
+    """
+    t2 = tokens(c2)
+    log('tokens', t2)
+    a2 = parsed_ast(t2)
+    log('parsed_ast', a2)
+    v2 = [1, 2, 3]
+    # log(apply(t2))
+    # ensure(apply(t2) == v2, 'test tokens 1')
 
 
 def test():
